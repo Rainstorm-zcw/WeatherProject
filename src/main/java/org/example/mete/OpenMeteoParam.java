@@ -17,6 +17,7 @@ import javax.validation.constraints.DecimalMax;
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
+import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -64,6 +65,22 @@ public class OpenMeteoParam {
             example = "temperature_2m,wind_speed_10m,wind_direction_10m,shortwave_radiation,"
                     + "cloud_cover,surface_pressure,relative_humidity_2m,dew_point_2m,precipitation,snowfall")
     private List<WeatherVariable> hourly = new ArrayList<>(WeatherVariable.DEFAULT_VARIABLES);
+
+    /**
+     * Open-Meteo 模型，多个用逗号分隔；不传时使用 best_match。
+     * <p>
+     * 例如选 {@code icon_global} 可以和 Windy 的 {@code icon} 模型做同源对比。
+     */
+    @Size(max = 200, message = "models 长度不能超过 200")
+    @Pattern(regexp = "^[A-Za-z0-9_,.-]*$", message = "models 只能包含字母、数字、下划线、点和逗号")
+    @Schema(description = "Open-Meteo 模型，多个用逗号分隔；不传时使用 best_match，"
+            + "例如 icon_global 对应 Windy 的 icon 模型",
+            example = "icon_global",
+            allowableValues = {"best_match", "icon_global", "icon_eu", "icon_d2", "gfs_global",
+                    "gfs_seamless", "ecmwf_ifs025", "ecmwf_ifs04", "jma_seamless",
+                    "meteofrance_seamless", "ukmo_seamless", "gem_seamless",
+                    "bom_access_global", "cma_grapes_global"})
+    private String models;
 
     /**
      * 时区，决定 hourly.time 的本地时间口径。

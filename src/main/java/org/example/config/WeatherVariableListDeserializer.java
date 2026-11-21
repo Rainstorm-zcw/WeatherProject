@@ -12,20 +12,27 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 兼容两种入参写法：
+ * <ul>
+ *     <li>JSON 数组：["temperature_2m", "wind_speed_10m"]</li>
+ *     <li>逗号分隔字符串："temperature_2m,wind_speed_10m"</li>
+ * </ul>
+ *
+ * @author windy
+ */
 public class WeatherVariableListDeserializer extends JsonDeserializer<List<WeatherVariable>> {
+
     @Override
-    public List<WeatherVariable> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+    public List<WeatherVariable> deserialize(JsonParser parser, DeserializationContext context) throws IOException {
         List<WeatherVariable> result = new ArrayList<>();
 
-        // 如果传的是 JSON 数组 ["A", "B"]
-        if (p.currentToken() == JsonToken.START_ARRAY) {
-            while (p.nextToken() != JsonToken.END_ARRAY) {
-                result.add(WeatherVariable.fromString(p.getValueAsString()));
+        if (parser.currentToken() == JsonToken.START_ARRAY) {
+            while (parser.nextToken() != JsonToken.END_ARRAY) {
+                result.add(WeatherVariable.fromString(parser.getValueAsString()));
             }
-        }
-        // 如果传的是逗号分隔的字符串 "A,B"
-        else if (p.currentToken() == JsonToken.VALUE_STRING) {
-            String value = p.getValueAsString();
+        } else if (parser.currentToken() == JsonToken.VALUE_STRING) {
+            String value = parser.getValueAsString();
             if (value != null && !value.trim().isEmpty()) {
                 result.addAll(Arrays.stream(value.split(","))
                         .map(String::trim)

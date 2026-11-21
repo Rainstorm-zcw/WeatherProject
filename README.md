@@ -1,17 +1,19 @@
 # windy-openMeteoProject
 
-基于 [Open-Meteo](https://open-meteo.com/) 免费天气 API 的**逐小时天气数据服务**，Spring Boot 2.7 + Java 17 实现。
-不需要 API Key，开箱即用。
+基于 [Open-Meteo](https://open-meteo.com/) 与 [Windy](https://www.windy.com/) 的**逐小时天气数据服务**，Spring Boot 2.7 + Java 17 实现。
+Open-Meteo 不需要 API Key；Windy 通过预登录 + 账号登录拿 token。
 
 ## 功能
 
 - 调用 `https://api.open-meteo.com/v1/forecast`，按 **1 小时** 粒度返回数据；
+- 调用 Windy `account.windy.com` 预登录 / 登录，再调用 `node.windy.com` point forecast；
 - 一次返回 10 项要素：温度、风速、风向、辐照、云量、气压、相对湿度、露点温度、降水量、降雪量；
 - 按数组下标把 Open-Meteo 的并行数组扁平化成 `List<HourlyWeather>`（一行一小时）；
+- Windy 返回的并行数组同样扁平化成 `List<WindyHourlyWeather>`；
 - 支持 GET 查询参数与 POST JSON 两种调用方式；
 - 参数校验（Bean Validation）、统一响应结构、全局异常处理；
 - Knife4j / OpenAPI3 在线接口文档；
-- 单元测试使用 `MockRestServiceServer`，不依赖真实网络。
+- 单元测试使用 `MockRestServiceServer` / Mockito，不依赖真实网络。
 
 ## 技术栈
 
@@ -37,8 +39,7 @@ src/main/java/org/example
 │   ├── RestTemplateConfig.java        # RestTemplate 超时/日志
 │   └── WebConfig.java                 # String -> 枚举转换器
 ├── controller
-│   ├── OpenMeteController.java        # 天气接口
-│   └── WindyController.java           # 预留的 Windy 平台接口
+│   └── OpenMeteController.java        # Open-Meteo 天气接口
 ├── exception
 │   ├── GlobalExceptionHandler.java    # 全局异常处理
 │   └── OpenMeteoException.java        # 调用异常
@@ -52,9 +53,28 @@ src/main/java/org/example
 │   ├── TemperatureUnit.java
 │   ├── WindSpeedUnit.java
 │   └── PrecipitationUnit.java
-└── service
-    ├── OpenMeteoService.java
-    └── impl/OpenMeteoServiceImpl.java
+├── service
+│   ├── OpenMeteoService.java
+│   └── impl/OpenMeteoServiceImpl.java
+└── windy                              # Windy 平台相关代码（独立目录）
+    ├── client/WindyApiClient.java     # 预登录 / 登录 / point forecast
+    ├── config
+    │   ├── WindyProperties.java
+    │   └── WindyRestTemplateConfig.java
+    ├── controller/WindyController.java
+    ├── exception/WindyException.java
+    ├── model
+    │   ├── WindyForecastParam.java    # 查询参数 bean
+    │   ├── WindyLoginParam.java       # 登录请求体 bean
+    │   ├── WindySession.java
+    │   ├── WindyAccountResponse.java
+    │   ├── WindyForecastResponse.java
+    │   ├── WindyHourlyWeather.java
+    │   └── WindyTokenClaims.java
+    └── service
+        ├── WindySessionManager.java
+        ├── WindyWeatherService.java
+        └── impl/WindyWeatherServiceImpl.java
 
 src/main/resources/application.yml
 src/test/java/org/example/...          # 上下文测试 + 服务单元测试
@@ -89,6 +109,22 @@ java -jar target/windy-openMeteoProject-1.0-SNAPSHOT.jar
 | `open-meteo.default-longitude` | `116.4074` | 未传经度时的默认经度 |
 | `open-meteo.default-forecast-days` | `7` | 未指定日期区间时的预报天数（0~16） |
 
+Windy 配置：
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `windy.account-base-url` | `https://account.windy.com` | 预登录 / 登录地址 |
+| `windy.node-base-url` | `https://node.windy.com` | point forecast 地址 |
+| `windy.version` | `51.4.4` | 客户端版本参数 `v` |
+| `windy.country` | `my` | 预登录国家参数 |
+| `windy.default-model` | `icon` | 默认模型 |
+| `windy.default-days` | `5` | 默认预报天数（1~7） |
+| `windy.default-step` | `1` | 1=逐小时（premium），3=3 小时 |
+| `windy.timezone` | `Asia/Shanghai` | 时间戳转本地时间使用的时区 |
+| `windy.login-enabled` | `true` | 是否自动登录 |
+| `windy.email` / `windy.password` | 环境变量 `WINDY_EMAIL` / `WINDY_PASSWORD` | Windy 账号，建议用环境变量覆盖 |
+| `windy.radiation.open-meteo-fallback` | `true` | Windy 无辐照字段时用 Open-Meteo 补齐 |
+
 ## 接口说明
 
 ### 1）GET 逐小时天气
@@ -102,6 +138,7 @@ GET /api/open-meteo/hourly?latitude=39.9042&longitude=116.4074&forecastDays=1
 | `latitude` | double | 否 | 纬度，默认 39.9042 |
 | `longitude` | double | 否 | 经度，默认 116.4074 |
 | `hourly` | string | 否 | 变量名，逗号分隔，默认 10 项全取 |
+| `models` | string | 否 | 模型名，逗号分隔；默认 `best_match`，例如 `icon_global` |
 | `timezone` | string | 否 | 时区，默认 `Asia/Shanghai` |
 | `forecastDays` | int | 否 | 预报天数 0~16，默认 7 |
 | `pastDays` | int | 否 | 追溯天数 0~92 |
@@ -121,6 +158,15 @@ curl "http://localhost:8080/api/open-meteo/hourly?latitude=31.2304&longitude=121
 ```bash
 curl "http://localhost:8080/api/open-meteo/hourly?latitude=31.2304&longitude=121.4737&forecastDays=1&hourly=temperature_2m,wind_speed_10m,precipitation"
 ```
+
+指定模型（`icon_global` 对应 Windy 的 `icon`）：
+
+```bash
+curl "http://localhost:8080/api/open-meteo/hourly?latitude=31.232&longitude=121.469&forecastDays=1&models=icon_global&timezone=Asia/Shanghai"
+```
+
+> 即使选择同一个 ICON 模型，Open-Meteo 与 Windy 的网格点、海拔订正和起报时次也可能不同，
+> 数值不会完全一致；做对比时请按 `time` 对齐，不要按数组下标。
 
 指定日期区间：
 
@@ -189,6 +235,78 @@ GET /api/open-meteo/forecast?latitude=31.2304&longitude=121.4737&forecastDays=1
 | 降水量 | `precipitation` | mm |
 | 降雪量 | `snowfall` | cm |
 
+## Windy 平台接口
+
+### 预登录与登录流程
+
+1. **预登录**：随机生成 `uid`（UUID），请求
+   `GET https://account.windy.com/api/info?country=my&pr=1&sc=0&token2=pending&uid={uid}&v=51.4.4&poc=4`
+   ，响应里的 `token` 就是后续的 `token2`。
+2. **登录**：请求
+   `POST https://account.windy.com/api/login?pr=0&sc=0&token2={预登录token}&uid={uid}&v=51.4.4&poc=92`
+   ，body 为：
+   ```json
+   {
+     "deviceId": "{uid}",
+     "email": "账号",
+     "password": "密码",
+     "platform": "desktop",
+     "target": "index"
+   }
+   ```
+   **`deviceId` 就是预登录生成的那个 `uid`**，Windy 用它把 token 与客户端设备绑定；两处必须一致。
+3. 登录后拿到带 `userID`、`subscriptionTiers` 的 token；只有 premium 账号的 `step=1` 才会真正返回逐小时数据，游客 token 会被降级为 3 小时。
+
+服务启动后首次调用会自动完成上述流程，并把 token 缓存在内存中，过期前 10 分钟自动刷新。
+
+### 接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/windy/session` | 获取当前会话（自动预登录/登录），返回 uid、token、auth、premium |
+| POST | `/api/windy/session/refresh` | 强制刷新会话 |
+| GET | `/api/windy/hourly` | 逐小时 10 项要素 |
+| POST | `/api/windy/hourly` | 同上，参数走 JSON body |
+| GET | `/api/windy/forecast` | Windy point forecast 原始结构 |
+
+`/api/windy/hourly` 参数：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `latitude` | double | 是 | 纬度 |
+| `longitude` | double | 是 | 经度 |
+| `model` | string | 否 | 默认 `icon` |
+| `days` | int | 否 | 1~7，默认 5 |
+| `step` | int | 否 | 1=逐小时，3=3 小时，默认 1 |
+| `timezone` | string | 否 | 不传时用 Windy 返回的地点时区 |
+| `uid` / `token2` | string | 否 | 同时留空则使用服务端缓存的会话 |
+
+```bash
+# 查看当前会话
+curl "http://localhost:8080/api/windy/session"
+
+# 上海逐小时
+curl "http://localhost:8080/api/windy/hourly?latitude=31.232&longitude=121.469&days=1&step=1"
+```
+
+### Windy 字段与 10 项要素对照
+
+| 要素 | Windy 字段 | 处理方式 |
+| --- | --- | --- |
+| 温度 | `data.temperature` | K → °C |
+| 风速 | `data.wind` | m/s → km/h |
+| 风向 | `data.windDir` | 直接使用 ° |
+| 辐照 | 无 | **用 Open-Meteo `shortwave_radiation` 补齐**，`radiationSource=OPEN_METEO` |
+| 云量 | `meteogram.cloud-XXXh` | 分层云量按随机重叠法合成 % |
+| 气压 | `data.pressure` | Pa → hPa |
+| 相对湿度 | 无 | 由 `temperature` + `meteogram.dewPoint` 按 Magnus 公式计算 |
+| 露点温度 | `meteogram.dewPoint` | K → °C |
+| 降水量 | `data.precipAmount` | mm |
+| 降雪量 | `data.precipSnowAmount` | cm |
+
+> Windy 的 point forecast 接口本身没有辐照字段（官方 Point Forecast API 参数表也没有 radiation），
+> 所以默认用项目中已有的 Open-Meteo 数据补齐；把 `windy.radiation.open-meteo-fallback` 设为 `false` 可关闭。
+
 ## 测试
 
 ```bash
@@ -196,11 +314,14 @@ mvn test
 ```
 
 - `OpenMeteoApplicationTest`：验证 Spring 上下文、配置绑定、Knife4j 自动配置；
-- `OpenMeteoServiceImplTest`：用 `MockRestServiceServer` 模拟 Open-Meteo 响应，验证参数拼接与数组扁平化逻辑。
+- `OpenMeteoServiceImplTest`：用 `MockRestServiceServer` 模拟 Open-Meteo 响应，验证参数拼接与数组扁平化逻辑；
+- `OpenMeteoParamValidationTest`：验证经纬度、日期区间等参数校验；
+- `OpenMeteoControllerTest`：MockMvc 验证查询参数绑定与统一异常响应；
+- `WindyWeatherServiceImplTest`：验证 Windy 单位换算、RH/云量计算与辐照回退。
 
 ## 网络与代理
 
-本机若需要代理才能访问 `api.open-meteo.com`，启动时给 JVM 加上代理参数即可，代码无需改动：
+本机若需要代理才能访问 `api.open-meteo.com`、`account.windy.com`、`node.windy.com`，启动时给 JVM 加上代理参数即可，代码无需改动：
 
 ```bash
 java -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7890 \
@@ -214,4 +335,8 @@ Maven 构建如需代理，在 Maven `settings.xml` 的 `<proxies>` 中配置。
 
 - Open-Meteo 免费接口对非商业用途有频率限制，生产环境建议增加缓存或限流；
 - `start_date`/`end_date` 与 `forecast_days`/`past_days` 在 Open-Meteo 中互斥，代码里已按日期区间优先处理；
-- 时间字段为**请求时区下的本地时间**（默认 `Asia/Shanghai`）。
+- 时间字段为**请求时区下的本地时间**（默认 `Asia/Shanghai`）；
+- Windy token 有效期约 2 天，服务内部会缓存并提前刷新；
+- Windy 游客 token 只能拿 3 小时步长，逐小时需要 premium 账号且 `windy.login-enabled=true`；
+- Windy 的 `precipSnowAmount` 按 cm 处理（与 Windy 平台雪量单位一致）；
+- 账号密码默认写在 `application.yml` 的占位符里，生产环境请改用 `WINDY_EMAIL` / `WINDY_PASSWORD` 环境变量。

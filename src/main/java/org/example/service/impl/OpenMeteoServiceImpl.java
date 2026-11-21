@@ -90,6 +90,10 @@ public class OpenMeteoServiceImpl implements OpenMeteoService {
         query.put("timezone", Optional.ofNullable(param.getTimezone())
                 .filter(StringUtils::hasText)
                 .orElse(openMeteoProperties.getTimezone()));
+        Optional.ofNullable(param.getModels())
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .ifPresent(models -> query.put("models", models));
 
         boolean hasStartDate = param.getStartDate() != null;
         boolean hasEndDate = param.getEndDate() != null;

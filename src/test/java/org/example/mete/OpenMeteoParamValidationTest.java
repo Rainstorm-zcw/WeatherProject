@@ -58,6 +58,17 @@ class OpenMeteoParamValidationTest {
     }
 
     @Test
+    void shouldRejectInvalidModels() {
+        OpenMeteoParam param = OpenMeteoParam.builder()
+                .models("icon_global;drop table")
+                .build();
+
+        Set<ConstraintViolation<OpenMeteoParam>> violations = validator.validate(param);
+
+        assertThat(violations).anyMatch(violation -> violation.getPropertyPath().toString().equals("models"));
+    }
+
+    @Test
     void shouldAcceptDefaultParam() {
         assertThat(validator.validate(OpenMeteoParam.builder().build())).isEmpty();
     }

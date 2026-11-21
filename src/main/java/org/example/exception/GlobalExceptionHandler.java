@@ -2,6 +2,7 @@ package org.example.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.common.R;
+import org.example.windy.exception.WindyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
@@ -78,6 +79,16 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_GATEWAY)
     public R<Void> handleOpenMeteoException(OpenMeteoException exception) {
         log.error("Open-Meteo 调用异常", exception);
+        return R.fail(HttpStatus.BAD_GATEWAY.value(), exception.getMessage());
+    }
+
+    /**
+     * 处理 Windy 调用失败。
+     */
+    @ExceptionHandler(WindyException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public R<Void> handleWindyException(WindyException exception) {
+        log.error("Windy 调用异常", exception);
         return R.fail(HttpStatus.BAD_GATEWAY.value(), exception.getMessage());
     }
 

@@ -82,6 +82,7 @@ class OpenMeteoServiceImplTest {
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(requestTo(containsString("latitude=39.9042")))
                 .andExpect(requestTo(containsString("longitude=116.4074")))
+                .andExpect(requestTo(containsString("models=icon_global")))
                 .andExpect(requestTo(containsString("temperature_2m")))
                 .andExpect(requestTo(containsString("wind_speed_10m")))
                 .andExpect(requestTo(containsString("shortwave_radiation")))
@@ -93,7 +94,9 @@ class OpenMeteoServiceImplTest {
                 .andExpect(requestTo(containsString("snowfall")))
                 .andRespond(withSuccess(RESPONSE_JSON, MediaType.APPLICATION_JSON));
 
-        List<HourlyWeather> rows = service.fetchHourly(OpenMeteoParam.builder().build());
+        List<HourlyWeather> rows = service.fetchHourly(OpenMeteoParam.builder()
+                .models("icon_global")
+                .build());
 
         assertThat(rows).hasSize(2);
         HourlyWeather first = rows.get(0);

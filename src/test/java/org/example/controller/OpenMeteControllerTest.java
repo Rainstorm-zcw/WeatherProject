@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,6 +67,19 @@ class OpenMeteControllerTest {
         mockMvc.perform(get("/api/open-meteo/hourly").param("startDate", "2026-11-20"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void shouldAcceptCommaSeparatedHourlyInJsonBody() throws Exception {
+        when(restTemplate.getForObject(any(URI.class), eq(OpenMeteoResult.class)))
+                .thenReturn(mockResult());
+
+        mockMvc.perform(post("/api/open-meteo/hourly")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"latitude\":39.9,\"longitude\":116.4,"
+                                + "\"hourly\":\"temperature_2m,wind_speed_10m\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].temperature").value(1.5));
     }
 
     private OpenMeteoResult mockResult() {

@@ -107,12 +107,17 @@ public enum WeatherVariable {
                 .orElseThrow(() -> new IllegalArgumentException("不支持的 Open-Meteo 天气变量: " + apiName));
     }
 
-    @JsonCreator
-    public static WeatherVariable fromString(String v) {
+    /**
+     * 供自定义反序列化器使用：只接受 API 变量名，例如 {@code temperature_2m}。
+     *
+     * @param value API 变量名
+     * @return 对应的枚举值
+     */
+    public static WeatherVariable fromString(String value) {
         return Arrays.stream(values())
-                .filter(e -> e.apiName.equalsIgnoreCase(v))
+                .filter(variable -> variable.apiName.equalsIgnoreCase(value))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("未知变量: " + v));
+                .orElseThrow(() -> new IllegalArgumentException("未知变量: " + value));
     }
 
     /**
