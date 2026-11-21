@@ -63,8 +63,8 @@ public class WindyController {
 
     @Operation(summary = "原始 point forecast 响应",
             description = "返回 Windy v3.0 原始 data / meteogram / celestial 结构，便于排查")
-    @GetMapping("/forecast")
-    public R<WindyForecastResponse> forecast(@Valid @ModelAttribute WindyForecastParam param) {
+    @PostMapping("/forecast")
+    public R<WindyForecastResponse> forecast(@Valid @RequestBody WindyForecastParam param) {
         return R.ok(windyWeatherService.fetchForecast(param));
     }
 }

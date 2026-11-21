@@ -32,13 +32,13 @@ public class WindyForecastParam {
     @NotNull(message = "纬度不能为空")
     @DecimalMin(value = "-90.0", message = "纬度必须在 -90 ~ 90 之间")
     @DecimalMax(value = "90.0", message = "纬度必须在 -90 ~ 90 之间")
-    @Schema(description = "纬度", example = "31.232", required = true)
+    @Schema(description = "纬度", example = "31.359", required = true)
     private Double latitude;
 
     @NotNull(message = "经度不能为空")
     @DecimalMin(value = "-180.0", message = "经度必须在 -180 ~ 180 之间")
     @DecimalMax(value = "180.0", message = "经度必须在 -180 ~ 180 之间")
-    @Schema(description = "经度", example = "121.469", required = true)
+    @Schema(description = "经度", example = "121.400", required = true)
     private Double longitude;
 
     @Builder.Default

@@ -70,6 +70,20 @@ public class WindyProperties {
     @NotBlank
     private String timezone = "Asia/Shanghai";
 
+    /**
+     * Windy 请求的 Accept 头。
+     * <p>
+     * 这个头会决定 Windy 返回哪一套数据：只发 {@code application/json} 时，
+     * 同一 URL 会返回偏低约 9°C 的 surface 数据；带上 {@code binary/hdagag$indc444}
+     * 才返回和官网一致的 2m 数据。
+     * <p>
+     * 官网前端原始值是 {@code "application/json binary/hdagag$indc444"}（空格分隔）；
+     * Spring 的 {@code HttpHeaders#getAccept()} 解析空格分隔会报错，因此这里用逗号分隔，
+     * 服务端收到的仍是同样两个媒体类型。
+     */
+    @NotBlank
+    private String acceptHeader = "application/json, binary/hdagag$indc444";
+
     @NotNull
     private Duration connectTimeout = Duration.ofSeconds(5);
 
