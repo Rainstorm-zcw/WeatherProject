@@ -30,6 +30,8 @@ windy:
   node-base-url: https://node.windy.com
   version: 51.4.4
   country: my
+  # Windy 前端 Accept；官网用空格分隔，这里用逗号避免 Spring 解析异常
+  accept-header: "application/json, binary/hdagag$indc444"
   default-model: icon
   default-days: 5
   # 1=逐小时（需要 premium 账号），3=3 小时

@@ -259,6 +259,28 @@ GET /api/open-meteo/forecast?latitude=31.2304&longitude=121.4737&forecastDays=1
 
 服务启动后首次调用会自动完成上述流程，并把 token 缓存在内存中，过期前 10 分钟自动刷新。
 
+### 请求头（很重要）
+
+调用 `node.windy.com` 时，`Accept` 必须带上官网的自定义类型：
+
+```http
+Accept: application/json binary/hdagag$indc444
+```
+
+实测同一个 URL、同一个 `refTime`：
+
+- 只发 `Accept: application/json`：北京 00:00 返回 **-8.3°C**；
+- 带上 `binary/hdagag$indc444`：同一时刻返回 **+1.11°C**，才和官网、Open-Meteo 对得上。
+
+也就是说，这个头决定了 Windy 返回哪一套数据，不是可有可无的装饰。Spring 的 `HttpHeaders#getAccept()` 解析空格分隔会报错，所以项目里配置成逗号分隔：
+
+```yaml
+windy:
+  accept-header: "application/json, binary/hdagag$indc444"
+```
+
+其余请求头：`User-Agent`、`Origin`、`Referer` 必须带；`Cache-Control/Pragma: no-cache` 建议带；`Sec-Ch-Ua*`、`Sec-Fetch-*`、`Priority` 可选；不要手动设置 `Accept-Encoding`。
+
 ### 接口
 
 | 方法 | 路径 | 说明 |

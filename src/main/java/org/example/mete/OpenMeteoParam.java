@@ -44,7 +44,7 @@ public class OpenMeteoParam {
      */
     @DecimalMin(value = "-90.0", message = "纬度必须在 -90 ~ 90 之间")
     @DecimalMax(value = "90.0", message = "纬度必须在 -90 ~ 90 之间")
-    @Schema(description = "纬度，不传时使用配置的默认值", example = "39.9042")
+    @Schema(description = "纬度，不传时使用配置的默认值", example = "31.359")
     private Double latitude;
 
     /**
@@ -52,7 +52,7 @@ public class OpenMeteoParam {
      */
     @DecimalMin(value = "-180.0", message = "经度必须在 -180 ~ 180 之间")
     @DecimalMax(value = "180.0", message = "经度必须在 -180 ~ 180 之间")
-    @Schema(description = "经度，不传时使用配置的默认值", example = "116.4074")
+    @Schema(description = "经度，不传时使用配置的默认值", example = "121.400")
     private Double longitude;
 
     /**
@@ -81,6 +81,7 @@ public class OpenMeteoParam {
                     "meteofrance_seamless", "ukmo_seamless", "gem_seamless",
                     "bom_access_global", "cma_grapes_global"})
     private String models;
+    //ecmwf_ifs025，icon_global，gfs_global
 
     /**
      * 时区，决定 hourly.time 的本地时间口径。
