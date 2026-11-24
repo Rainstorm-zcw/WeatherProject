@@ -1,5 +1,9 @@
 package org.example.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.example.mete.HourlyData;
 import org.example.mete.OpenMeteoResult;
 import org.junit.jupiter.api.Test;
@@ -56,6 +60,43 @@ class OpenMeteControllerTest {
     }
 
     @Test
+    void shouldBindMultipleCoordinatesForBatch() throws Exception {
+        when(restTemplate.getForObject(any(URI.class), eq(JsonNode.class)))
+                .thenReturn(mockBatchResult());
+
+        mockMvc.perform(get("/api/open-meteo/hourly/batch")
+                        .param("latitude", "39.9,31.2")
+                        .param("longitude", "116.4,121.5")
+                        .param("forecastDays", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].hourly[0].temperature").value(1.2));
+    }
+
+    @Test
+    void shouldAcceptCoordinateArraysInBatchPost() throws Exception {
+        when(restTemplate.getForObject(any(URI.class), eq(JsonNode.class)))
+                .thenReturn(mockBatchResult());
+
+        mockMvc.perform(post("/api/open-meteo/hourly/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"latitude\":[39.9,31.2],\"longitude\":[116.4,121.5],"
+                                + "\"forecastDays\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].hourly[0].temperature").value(1.2));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenBatchCoordinateSizeDiffers() throws Exception {
+        mockMvc.perform(get("/api/open-meteo/hourly/batch")
+                        .param("latitude", "39.9,31.2")
+                        .param("longitude", "116.4"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
     void shouldReturnBadRequestWhenLatitudeInvalid() throws Exception {
         mockMvc.perform(get("/api/open-meteo/hourly").param("latitude", "100"))
                 .andExpect(status().isBadRequest())
@@ -82,8 +123,25 @@ class OpenMeteControllerTest {
                 .andExpect(jsonPath("$.data[0].temperature").value(1.5));
     }
 
-    private OpenMeteoResult mockResult() {
-        HourlyData hourly = new HourlyData();
+    private JsonNode mockBatchResult() {
+        ObjectMapper mapper = new ObjectMapper();
+        ArrayNode array = mapper.createArrayNode();
+        ObjectNode location = mapper.createObjectNode();
+        location.put("latitude", 39.875);
+        location.put("longitude", 116.375);
+        location.put("elevation", 50.0);
+        location.put("timezone", "Asia/Shanghai");
+
+        ObjectNode hourly = mapper.createObjectNode();
+        hourly.putArray("time").add("2026-11-24T00:00");
+        hourly.putArray("temperature_2m").add(1.2);
+        hourly.putArray("wind_speed_10m").add(5.0);
+        location.set("hourly", hourly);
+        array.add(location);
+        return array;
+    }
+
+    private OpenMeteoResult mockResult() {        HourlyData hourly = new HourlyData();
         hourly.setTime(List.of("2026-11-20T00:00"));
         hourly.setTemperature2m(List.of(1.5));
         hourly.setWindSpeed10m(List.of(10.0));

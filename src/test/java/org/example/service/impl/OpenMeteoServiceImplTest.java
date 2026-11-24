@@ -2,6 +2,8 @@ package org.example.service.impl;
 
 import org.example.config.OpenMeteoProperties;
 import org.example.mete.HourlyWeather;
+import org.example.mete.OpenMeteoBatchParam;
+import org.example.mete.OpenMeteoLocationResult;
 import org.example.mete.OpenMeteoParam;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,6 +11,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -65,6 +69,33 @@ class OpenMeteoServiceImplTest {
             }
             """;
 
+    private static final String BATCH_RESPONSE_JSON = """
+            [
+              {
+                "latitude": 39.875,
+                "longitude": 116.375,
+                "elevation": 50.0,
+                "timezone": "Asia/Shanghai",
+                "hourly": {
+                  "time": ["2026-11-24T00:00"],
+                  "temperature_2m": [1.2],
+                  "wind_speed_10m": [5.0]
+                }
+              },
+              {
+                "latitude": 31.25,
+                "longitude": 121.5,
+                "elevation": 7.0,
+                "timezone": "Asia/Shanghai",
+                "hourly": {
+                  "time": ["2026-11-24T00:00"],
+                  "temperature_2m": [12.0],
+                  "wind_speed_10m": [8.0]
+                }
+              }
+            ]
+            """;
+
     private MockRestServiceServer server;
 
     private OpenMeteoServiceImpl service;
@@ -73,7 +104,7 @@ class OpenMeteoServiceImplTest {
     void setUp() {
         RestTemplate restTemplate = new RestTemplate();
         server = MockRestServiceServer.bindTo(restTemplate).build();
-        service = new OpenMeteoServiceImpl(restTemplate, new OpenMeteoProperties());
+        service = new OpenMeteoServiceImpl(restTemplate, new OpenMeteoProperties(), new ObjectMapper());
     }
 
     @Test
@@ -112,6 +143,32 @@ class OpenMeteoServiceImplTest {
         assertThat(first.getPrecipitation()).isZero();
         assertThat(first.getSnowfall()).isZero();
         assertThat(rows.get(1).getTemperature()).isEqualTo(2.5);
+        server.verify();
+    }
+
+    @Test
+    void shouldFetchMultipleCoordinates() {
+        server.expect(once(), requestTo(containsString("/v1/forecast")))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(requestTo(containsString("latitude=39.9042")))
+                .andExpect(requestTo(containsString("longitude=116.4074")))
+                .andExpect(requestTo(containsString("31.2304")))
+                .andExpect(requestTo(containsString("121.4737")))
+                .andRespond(withSuccess(BATCH_RESPONSE_JSON, MediaType.APPLICATION_JSON));
+
+        List<OpenMeteoLocationResult> results = service.fetchHourlyBatch(OpenMeteoBatchParam.builder()
+                .latitude(List.of(39.9042, 31.2304))
+                .longitude(List.of(116.4074, 121.4737))
+                .forecastDays(1)
+                .build());
+
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).getLatitude()).isEqualTo(39.875);
+        assertThat(results.get(0).getLongitude()).isEqualTo(116.375);
+        assertThat(results.get(0).getElevation()).isEqualTo(50.0);
+        assertThat(results.get(0).getHourly()).hasSize(1);
+        assertThat(results.get(0).getHourly().get(0).getTemperature()).isEqualTo(1.2);
+        assertThat(results.get(1).getHourly().get(0).getTemperature()).isEqualTo(12.0);
         server.verify();
     }
 

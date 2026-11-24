@@ -2,10 +2,15 @@ package org.example.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.config.OpenMeteoProperties;
 import org.example.exception.OpenMeteoException;
 import org.example.mete.HourlyData;
 import org.example.mete.HourlyWeather;
+import org.example.mete.OpenMeteoBatchParam;
+import org.example.mete.OpenMeteoLocationResult;
 import org.example.mete.OpenMeteoParam;
 import org.example.mete.OpenMeteoResult;
 import org.example.mete.WeatherVariable;
@@ -44,6 +49,8 @@ public class OpenMeteoServiceImpl implements OpenMeteoService {
 
     private final OpenMeteoProperties openMeteoProperties;
 
+    private final ObjectMapper objectMapper;
+
     @Override
     public List<HourlyWeather> fetchHourly(OpenMeteoParam param) {
         OpenMeteoResult result = fetchForecast(param);
@@ -51,6 +58,36 @@ public class OpenMeteoServiceImpl implements OpenMeteoService {
         log.info("Open-Meteo 返回 {} 条逐小时数据，变量: {}", rows.size(),
                 resolveVariables(Optional.ofNullable(param).orElseGet(OpenMeteoParam::new)));
         return rows;
+    }
+
+    @Override
+    public List<OpenMeteoLocationResult> fetchHourlyBatch(OpenMeteoBatchParam param) {
+        validateBatchParam(param);
+        URI uri = buildBatchUri(param);
+        log.info("请求 Open-Meteo 多点: {}", uri);
+        try {
+            JsonNode root = openMeteoRestTemplate.getForObject(uri, JsonNode.class);
+            if (root == null || root.isNull()) {
+                throw new OpenMeteoException("Open-Meteo 多点响应为空");
+            }
+            List<OpenMeteoResult> results = root.isArray()
+                    ? objectMapper.convertValue(root, new TypeReference<List<OpenMeteoResult>>() {
+                    })
+                    : List.of(objectMapper.convertValue(root, OpenMeteoResult.class));
+            return results.stream()
+                    .map(result -> OpenMeteoLocationResult.builder()
+                            .latitude(result.getLatitude())
+                            .longitude(result.getLongitude())
+                            .elevation(result.getElevation())
+                            .timezone(result.getTimezone())
+                            .hourly(toHourlyWeather(result))
+                            .build())
+                    .collect(Collectors.toList());
+        } catch (RestClientException exception) {
+            throw new OpenMeteoException("请求 Open-Meteo 多点失败: " + exception.getMessage(), exception);
+        } catch (IllegalArgumentException exception) {
+            throw new OpenMeteoException("解析 Open-Meteo 多点响应失败: " + exception.getMessage(), exception);
+        }
     }
 
     @Override
@@ -123,11 +160,77 @@ public class OpenMeteoServiceImpl implements OpenMeteoService {
     }
 
     /**
+     * 拼接多点查询参数。
+     *
+     * @param param 批量查询参数
+     * @return 请求 URI
+     */
+    private URI buildBatchUri(OpenMeteoBatchParam param) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put("latitude", join(param.getLatitude()));
+        query.put("longitude", join(param.getLongitude()));
+        query.put("hourly", resolveVariables(param.getHourly()).stream()
+                .map(WeatherVariable::getApiName)
+                .collect(Collectors.joining(",")));
+        query.put("timezone", Optional.ofNullable(param.getTimezone())
+                .filter(StringUtils::hasText)
+                .orElse(openMeteoProperties.getTimezone()));
+        Optional.ofNullable(param.getModels())
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .ifPresent(models -> query.put("models", models));
+
+        boolean hasStartDate = param.getStartDate() != null;
+        boolean hasEndDate = param.getEndDate() != null;
+        if (hasStartDate && hasEndDate) {
+            query.put("start_date", param.getStartDate());
+            query.put("end_date", param.getEndDate());
+        } else if (hasStartDate || hasEndDate) {
+            throw new OpenMeteoException("startDate 与 endDate 必须同时指定");
+        } else {
+            query.put("forecast_days", Optional.ofNullable(param.getForecastDays())
+                    .orElse(openMeteoProperties.getDefaultForecastDays()));
+            Optional.ofNullable(param.getPastDays())
+                    .ifPresent(days -> query.put("past_days", days));
+        }
+
+        Optional.ofNullable(param.getTemperatureUnit())
+                .ifPresent(unit -> query.put("temperature_unit", unit.getValue()));
+        Optional.ofNullable(param.getWindSpeedUnit())
+                .ifPresent(unit -> query.put("wind_speed_unit", unit.getValue()));
+        Optional.ofNullable(param.getPrecipitationUnit())
+                .ifPresent(unit -> query.put("precipitation_unit", unit.getValue()));
+
+        String baseUrl = StringUtils.trimTrailingCharacter(openMeteoProperties.getBaseUrl(), '/');
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(baseUrl).path(FORECAST_PATH);
+        query.forEach((name, value) -> builder.queryParam(name, value));
+        return builder.encode().build().toUri();
+    }
+
+    private void validateBatchParam(OpenMeteoBatchParam param) {
+        if (param == null || param.getLatitude() == null || param.getLongitude() == null
+                || param.getLatitude().isEmpty() || param.getLongitude().isEmpty()) {
+            throw new OpenMeteoException("批量查询至少需要一个经纬度");
+        }
+        if (param.getLatitude().size() != param.getLongitude().size()) {
+            throw new OpenMeteoException("latitude 与 longitude 数量必须一致");
+        }
+    }
+
+    private static String join(List<Double> values) {
+        return values.stream().map(String::valueOf).collect(Collectors.joining(","));
+    }
+
+    /**
      * 未指定变量时默认取 10 项全量。
      */
     private List<WeatherVariable> resolveVariables(OpenMeteoParam param) {
-        return Optional.ofNullable(param.getHourly())
-                .filter(variables -> !variables.isEmpty())
+        return resolveVariables(param.getHourly());
+    }
+
+    private List<WeatherVariable> resolveVariables(List<WeatherVariable> variables) {
+        return Optional.ofNullable(variables)
+                .filter(items -> !items.isEmpty())
                 .orElse(WeatherVariable.DEFAULT_VARIABLES);
     }
 
@@ -136,6 +239,9 @@ public class OpenMeteoServiceImpl implements OpenMeteoService {
      */
     private List<HourlyWeather> toHourlyWeather(OpenMeteoResult result) {
         HourlyData hourly = result.getHourly();
+        if (hourly == null) {
+            return Collections.emptyList();
+        }
         List<String> times = Optional.ofNullable(hourly.getTime()).orElseGet(Collections::emptyList);
         return IntStream.range(0, times.size())
                 .mapToObj(index -> HourlyWeather.builder()

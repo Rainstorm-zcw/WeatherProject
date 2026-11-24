@@ -196,6 +196,54 @@ GET /api/open-meteo/forecast?latitude=31.2304&longitude=121.4737&forecastDays=1
 
 返回 Open-Meteo 原始的 `OpenMeteoResult`（含 `hourly_units`、`utc_offset_seconds` 等字段）。
 
+### 4）多点批量查询
+
+`latitude` / `longitude` 支持一次传多个坐标，按坐标返回数组；单点接口保持不变。
+
+```bash
+# GET：逗号分隔
+curl "http://localhost:9989/api/open-meteo/hourly/batch?latitude=39.9042,31.2304&longitude=116.4074,121.4737&forecastDays=1&models=icon_global&hourly=temperature_2m,wind_speed_10m"
+```
+
+```bash
+# POST：数组、逗号字符串、单个数字都支持
+curl -X POST "http://localhost:9989/api/open-meteo/hourly/batch" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "latitude": [39.9042, 31.2304],
+    "longitude": [116.4074, 121.4737],
+    "forecastDays": 1,
+    "models": "icon_global",
+    "hourly": ["temperature_2m", "wind_speed_10m"]
+  }'
+```
+
+返回结构：
+
+```json
+{
+  "code": 200,
+  "data": [
+    {
+      "latitude": 39.875,
+      "longitude": 116.375,
+      "elevation": 47.0,
+      "timezone": "Asia/Shanghai",
+      "hourly": [{ "time": "2026-11-24 00:00", "temperature": 0.6, "windSpeed": 4.1 }]
+    },
+    {
+      "latitude": 31.25,
+      "longitude": 121.5,
+      "elevation": 5.0,
+      "timezone": "Asia/Shanghai",
+      "hourly": [{ "time": "2026-11-24 00:00", "temperature": 12.5, "windSpeed": 6.8 }]
+    }
+  ]
+}
+```
+
+> `latitude` 与 `longitude` 数量必须一致，单次最多 100 个坐标；返回的 `latitude/longitude` 是 API 就近取整后的网格坐标。
+
 ## 返回示例
 
 ```json
