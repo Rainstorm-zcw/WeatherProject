@@ -47,7 +47,7 @@ public class WindyForecastParam {
 
     @Builder.Default
     @Min(value = 1, message = "预报天数不能小于 1")
-    @Max(value = 7, message = "预报天数不能大于 7")
+    @Max(value = 15, message = "预报天数不能大于 15")
     @Schema(description = "预报天数（1 ~ 7），默认 5", example = "5")
     private Integer days = 5;
 

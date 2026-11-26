@@ -121,6 +121,8 @@ Windy 配置：
 | `windy.default-days` | `5` | 默认预报天数（1~7） |
 | `windy.default-step` | `1` | 1=逐小时（premium），3=3 小时 |
 | `windy.timezone` | `Asia/Shanghai` | 时间戳转本地时间使用的时区 |
+| `windy.proxy.host` | `127.0.0.1` | Windy HTTP 代理主机，留空表示直连 |
+| `windy.proxy.port` | `7890` | Windy HTTP 代理端口 |
 | `windy.login-enabled` | `true` | 是否自动登录 |
 | `windy.email` / `windy.password` | 环境变量 `WINDY_EMAIL` / `WINDY_PASSWORD` | Windy 账号，建议用环境变量覆盖 |
 | `windy.radiation.open-meteo-fallback` | `true` | Windy 无辐照字段时用 Open-Meteo 补齐 |
@@ -391,15 +393,27 @@ mvn test
 
 ## 网络与代理
 
-本机若需要代理才能访问 `api.open-meteo.com`、`account.windy.com`、`node.windy.com`，启动时给 JVM 加上代理参数即可，代码无需改动：
+Java 默认**不会使用** Windows/Clash 的系统代理，浏览器能秒开不代表 Java 能直连。
+
+Windy 已支持代码级代理，直接在 `application.yml` 配置即可，不需要 VM options：
+
+```yaml
+windy:
+  proxy:
+    host: 127.0.0.1   # 留空表示直连
+    port: 7890
+```
+
+默认就是本机 Clash 的 `127.0.0.1:7890`；如果代理端口不同，改 `port` 或设置环境变量 `WINDY_PROXY_HOST` / `WINDY_PROXY_PORT`。
+
+Open-Meteo 或 Maven 构建如需代理，仍可给 JVM 加参数：
 
 ```bash
 java -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7890 \
      -jar target/windy-openMeteoProject-1.0-SNAPSHOT.jar
 ```
 
-IDEA 中可把同样的参数加到运行配置的 **VM options** 里。
-Maven 构建如需代理，在 Maven `settings.xml` 的 `<proxies>` 中配置。
+IDEA 中可把同样的参数加到运行配置的 **VM options** 里；Maven 构建在 `settings.xml` 的 `<proxies>` 中配置。
 
 ## 备注
 

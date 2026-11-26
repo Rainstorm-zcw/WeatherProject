@@ -91,6 +91,25 @@ public class WindyProperties {
     private Duration readTimeout = Duration.ofSeconds(30);
 
     /**
+     * 可选 HTTP 代理；host 为空时直连。
+     */
+    private HttpProxy proxy = new HttpProxy();
+
+    @Data
+    public static class HttpProxy {
+
+        /**
+         * 代理主机，例如 127.0.0.1；留空表示不使用代理。
+         */
+        private String host;
+
+        /**
+         * 代理端口，默认 7890（Clash 常用端口）。
+         */
+        private int port = 7890;
+    }
+
+    /**
      * token 到期前多久主动刷新。
      */
     @NotNull

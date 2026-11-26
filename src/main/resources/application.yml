@@ -37,14 +37,18 @@ windy:
   # 1=逐小时（需要 premium 账号），3=3 小时
   default-step: 1
   timezone: Asia/Shanghai
-  connect-timeout: 10s
-  read-timeout: 30s
+  connect-timeout: 30s
+  read-timeout: 60s
+  # Java 默认不走系统代理；本机 Clash 一般填 127.0.0.1:7890，不需要代理时把 host 置空
+  proxy:
+    host: ${WINDY_PROXY_HOST:127.0.0.1}
+    port: ${WINDY_PROXY_PORT:7890}
   refresh-before: 10m
   # 自动登录；关闭后只能使用游客 token（3 小时步长）
   login-enabled: true
   # 建议用环境变量覆盖，避免把账号密码提交到仓库
-  email: ${WINDY_EMAIL:spot@cpirhzl.com}
-  password: ${WINDY_PASSWORD:Rhzl@2024}
+  email: ${WINDY_EMAIL:}
+  password: ${WINDY_PASSWORD:}
   radiation:
     # Windy point API 没有辐照字段，用 Open-Meteo 的 shortwave_radiation 补齐
     open-meteo-fallback: true

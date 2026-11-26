@@ -3,7 +3,10 @@ package org.example.windy.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.common.R;
+import org.example.dto.ProvinceCityLatLon;
+import org.example.dto.ProvinceCityLatLonData;
 import org.example.windy.model.WindyForecastParam;
 import org.example.windy.model.WindyForecastResponse;
 import org.example.windy.model.WindyHourlyWeather;
@@ -18,13 +21,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Windy 平台天气接口。
  *
  * @author windy
  */
+@Slf4j
 @Tag(name = "Windy 天气接口", description = "Windy 预登录 / 登录 / point forecast 逐小时天气")
 @RestController
 @RequestMapping("/api/windy")
@@ -66,5 +72,27 @@ public class WindyController {
     @PostMapping("/forecast")
     public R<WindyForecastResponse> forecast(@Valid @RequestBody WindyForecastParam param) {
         return R.ok(windyWeatherService.fetchForecast(param));
+    }
+
+    @Operation(summary = "根据多个经纬度查询windy数据",
+            description = "测试windy数据集")
+    @PostMapping("/testProvinceCityLonLat")
+    private R testProvinceCityLonLat( @RequestBody WindyForecastParam param){
+        List<ProvinceCityLatLon> cities = ProvinceCityLatLonData.LIST;
+
+        List<WindyHourlyWeather> windyHourlyWeatherNew = new ArrayList<>();
+                // 按省份过滤
+        List<ProvinceCityLatLon> gansuCities = cities.stream()
+                .filter(c -> "甘肃省".equals(c.getProvince()))
+                .toList();
+        log.info("输出省市区:{}", new ArrayList<>(gansuCities));
+        gansuCities.forEach(a->{
+            param.setLatitude(a.getLatitude());
+            param.setLongitude(a.getLongitude());
+            List<WindyHourlyWeather> windyHourlyWeathers = windyWeatherService.fetchHourly(param);
+            windyHourlyWeatherNew.addAll(windyHourlyWeathers);
+        });
+        return R.ok(windyHourlyWeatherNew);
+
     }
 }
